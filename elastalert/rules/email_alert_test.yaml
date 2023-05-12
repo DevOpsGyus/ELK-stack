@@ -1,0 +1,47 @@
+name: email_alert_test
+
+type: frequency
+
+index: tdg_node-*
+
+num_events: 1
+
+timeframe:
+  minutes: 2
+
+run_every:
+  minutes: 2
+
+aggregation:
+  minutes: 2
+
+aggregation_key: 'log.file.path'
+attach_related: false
+
+filter:
+- query:
+    query_string:
+      query: 'message: ?*'
+
+alert_subject: "ElastAlert test for ELK stack"
+
+# alert_text_type: alert_text_only
+
+alert_text: |
+  This a test email genrate accourding to elastalert
+    
+summary_table_fields: 
+- agent.id
+- agent.type
+- agent.hostname
+- log.file.path
+
+alert:
+- email
+
+email:
+  - thedevopsguys@elk.com
+smtp_host: "mailhog"
+smtp_port: 1025
+smtp_ssl: false
+from_addr: "alert@elk.com"

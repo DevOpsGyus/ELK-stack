@@ -1,0 +1,144 @@
+version: '3.2'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELK_VERSION}
+    container_name: "elasticsearch"
+    volumes:
+      - type: bind
+        source: ./elasticsearch/config/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      - type: volume
+        source: elasticsearch
+        target: /usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+      ELASTIC_PASSWORD: admin
+    networks:
+      - elk
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELK_VERSION}
+    container_name: logstash
+    volumes:
+      - type: bind
+        source: ./logstash/config/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+        read_only: true
+      - type: bind
+        source: ./logstash/pipeline
+        target: /usr/share/logstash/pipeline
+        read_only: true
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    expose: 
+      - "5044"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELK_VERSION}
+    container_name: kibana
+    volumes:
+      - type: bind
+        source: ./kibana/config/kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+    ports:
+      - "5601:5601"
+    networks:
+      - elk
+    depends_on:
+      - elasticsearch
+
+  app:
+    build : ./app
+    image: thedevopsguys/dummynodeapp
+    container_name: app
+    volumes:
+      - ./app/:/usr/src/app
+      - /usr/src/app/node_modules/ 
+    command: npm start
+    ports:
+      - "3000:3000"
+    networks:
+      - elk
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/config:/etc/nginx/conf.d
+      - ./nginx/log:/var/log/nginx
+    ports:
+      - "8020:80"
+      - "443:443"
+    links:
+      - app:app
+    depends_on: 
+      - app
+    networks:
+      - elk
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:${ELK_VERSION}
+    container_name: filebeat
+    entrypoint: "filebeat -e -strict.perms=false"
+    volumes:
+      - ./filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - ./nginx/log:/var/log/nginx
+    networks:
+      - elk
+    depends_on: 
+      - app
+      - nginx
+      - logstash
+      - elasticsearch
+      - kibana
+    links: 
+      - logstash
+  elastalert:
+    container_name: elastalert
+    image: karql/elastalert2-server
+    depends_on:
+        - elasticsearch
+        - kibana
+    cap_add:
+        - SYS_TIME
+        - SYS_NICE
+    ports:
+    - "3030:3030"
+    - "3333:3333"
+    volumes:
+        - ./elastalert/logs:/opt/logs
+        - ./elastalert/rules:/opt/rules
+        - ./elastalert/config:/opt/config
+        - ./elastalert/config/elastalert_config.yaml:/opt/elastalert/config.yaml
+        - ./elastalert/rules:/opt/elastalert/rules
+    networks:
+        - elk
+  mailhog:
+    image: mailhog/mailhog
+    container_name: 'mailhog'
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - elk
+
+networks:
+  elk:
+    name: tdg_elk
+    driver: bridge
+
+volumes:
+  elasticsearch:

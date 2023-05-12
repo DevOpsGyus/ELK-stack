@@ -1,0 +1,46 @@
+name: email_alert_test
+
+type: frequency
+
+index: tdg_node-*
+
+num_events: 5
+
+timeframe:
+  minutes: 1
+
+run_every:
+  minutes: 1
+
+aggregation:
+  minutes: 1
+
+aggregation_key: 'log.file.path'
+attach_related: true
+summary_table_fields: 
+- agent.id
+- agent.type
+- agent.hostname
+- log.file.path
+
+filter:
+- query:
+    query_string:
+      query: 'message: ?*'
+
+alert_subject: "ElastAlert test for aggregation for btiq sre elastalert"
+
+# alert_text_type: default
+
+alert_text: |
+  This a testing mail for ElastAlert create by thedevopsguys
+    
+alert:
+- email
+
+email:
+  - Piyush.Gautam@elk.com
+smtp_host: "mailhog"
+smtp_port: 1025
+smtp_ssl: false
+from_addr: "alert@elk.com"
